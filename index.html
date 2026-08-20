@@ -129,20 +129,20 @@
                 <div class="bg-white rounded-2xl p-3 shadow-sm sticky top-24">
                     <nav class="space-y-1">
                         <button class="side-tab-btn active w-full text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3" data-tab="orders" onclick="switchMainTab('orders')">
-                            <span></span> Заказы
+                            <span>📦</span> Заказы
                             <span id="sideCountOrders" class="ml-auto bg-sun text-white text-xs px-2 py-0.5 rounded-full">0</span>
                         </button>
                         <button class="side-tab-btn w-full text-left px-4 py-3 rounded-xl font-semibold text-charcoal/70 flex items-center gap-3" data-tab="catalog" onclick="switchMainTab('catalog')">
-                            <span>🏷</span> Каталог
+                            <span></span> Каталог
                         </button>
                         <button class="side-tab-btn w-full text-left px-4 py-3 rounded-xl font-semibold text-charcoal/70 flex items-center gap-3" data-tab="shift" onclick="switchMainTab('shift')">
                             <span>⏱</span> Смена
                         </button>
                         <button class="side-tab-btn w-full text-left px-4 py-3 rounded-xl font-semibold text-charcoal/70 flex items-center gap-3" data-tab="stats" onclick="switchMainTab('stats')">
-                            <span>📊</span> Статистика
+                            <span></span> Статистика
                         </button>
                         <button class="side-tab-btn w-full text-left px-4 py-3 rounded-xl font-semibold text-charcoal/70 flex items-center gap-3" data-tab="profile" onclick="switchMainTab('profile')">
-                            <span>👤</span> Профиль
+                            <span></span> Профиль
                         </button>
                     </nav>
                 </div>
@@ -162,7 +162,7 @@
                     <div class="bg-white rounded-2xl shadow-sm mb-4">
                         <div class="flex border-b border-charcoal/10">
                             <button class="tab-btn active flex-1 py-4 text-center font-semibold text-charcoal/60 border-b-2 border-transparent transition-all" data-subtab="requests" onclick="switchOrderTab('requests')">📥 Запросы на сборку <span id="countRequests" class="ml-1 bg-sun text-white text-xs px-2 py-0.5 rounded-full">0</span></button>
-                            <button class="tab-btn flex-1 py-4 text-center font-semibold text-charcoal/60 border-b-2 border-transparent transition-all" data-subtab="active" onclick="switchOrderTab('active')"> Активные <span id="countActive" class="ml-1 bg-ocean text-white text-xs px-2 py-0.5 rounded-full">0</span></button>
+                            <button class="tab-btn flex-1 py-4 text-center font-semibold text-charcoal/60 border-b-2 border-transparent transition-all" data-subtab="active" onclick="switchOrderTab('active')">⏱ Активные <span id="countActive" class="ml-1 bg-ocean text-white text-xs px-2 py-0.5 rounded-full">0</span></button>
                             <button class="tab-btn flex-1 py-4 text-center font-semibold text-charcoal/60 border-b-2 border-transparent transition-all" data-subtab="completed" onclick="switchOrderTab('completed')">✅ Выполненные <span id="countCompleted" class="ml-1 bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full">0</span></button>
                         </div>
                     </div>
@@ -313,63 +313,52 @@
         let activeTimersInterval = null;
         let shiftTimerInterval = null;
         let lunchTimerInterval = null;
-        let syncChannel = null;
         const TARGET_TIME_PER_ORDER = 10 * 60 * 1000;
 
-        // ========== BROADCAST CHANNEL ==========
-        function initSyncChannel() {
-            if (typeof BroadcastChannel !== 'undefined') {
-                syncChannel = new BroadcastChannel('solaris_sync');
-                syncChannel.onmessage = (event) => {
-                    const data = event.data;
-                    if (data.type === 'catalog_update') {
-                        renderCatalogManagement();
-                    } else if (data.type === 'order_created') {
-                        renderAllTabs();
-                        updateStats();
-                    }
-                };
-            }
-        }
-
-        function broadcastCatalogUpdate() {
-            if (syncChannel) {
-                syncChannel.postMessage({ type: 'catalog_update', timestamp: Date.now() });
-            }
-            const availability = getProductAvailability();
-            localStorage.setItem('solaris_product_availability', JSON.stringify(availability));
-        }
-
-        // ========== PRODUCT AVAILABILITY ==========
+        // ========== PRODUCT AVAILABILITY — VERSION BASED SYNC ==========
         function getProductAvailability() {
             const stored = localStorage.getItem('solaris_product_availability');
-            if (stored) return JSON.parse(stored);
+            if (stored) {
+                try { return JSON.parse(stored); } catch(e) {}
+            }
             const defaults = {};
             PRODUCTS.forEach(p => defaults[p.id] = true);
             localStorage.setItem('solaris_product_availability', JSON.stringify(defaults));
             return defaults;
         }
 
+        function getCatalogVersion() {
+            const v = localStorage.getItem('solaris_catalog_version');
+            return v ? parseInt(v) : 0;
+        }
+
+        function incrementCatalogVersion() {
+            const current = getCatalogVersion();
+            const newVersion = current + 1;
+            localStorage.setItem('solaris_catalog_version', newVersion.toString());
+            console.log('[WMS] Версия каталога:', newVersion);
+            return newVersion;
+        }
+
         function toggleProductAvailability(productId) {
             const availability = getProductAvailability();
             availability[productId] = !availability[productId];
             localStorage.setItem('solaris_product_availability', JSON.stringify(availability));
-            broadcastCatalogUpdate();
+            
+            // УВЕЛИЧИВАЕМ ВЕРСИЮ — это триггерит обновление на сайте
+            incrementCatalogVersion();
+            
             renderCatalogManagement();
             showToast('Каталог обновлён', `${PRODUCTS.find(p => p.id === productId).name}: ${availability[productId] ? 'В наличии' : 'Нет в наличии'}`);
         }
 
         // ========== INIT ==========
         document.addEventListener('DOMContentLoaded', () => {
-            initSyncChannel();
             checkAuth();
             window.addEventListener('storage', (e) => {
                 if (e.key && (e.key.startsWith('solaris_orders') || e.key.startsWith('solaris_messages'))) {
                     renderAllTabs();
                     updateStats();
-                }
-                if (e.key === 'solaris_product_availability') {
-                    renderCatalogManagement();
                 }
             });
         });
@@ -540,7 +529,7 @@
             renderAllTabs();
         }
 
-        // ========== ORDERS - ВСЕМ СОТРУДНИКАМ ==========
+        // ========== ORDERS ==========
         function getOrders() {
             let allOrders = [];
             for (let i = 0; i < localStorage.length; i++) {
@@ -1102,15 +1091,9 @@
             dummyOrders.push(testOrder);
             localStorage.setItem('solaris_orders_demo_user', JSON.stringify(dummyOrders));
             localStorage.setItem('solaris_messages_demo_user', JSON.stringify([]));
-            
-            if (syncChannel) {
-                syncChannel.postMessage({ type: 'order_created', orderId: testOrder.id, timestamp: Date.now() });
-            }
             window.dispatchEvent(new Event('storage'));
-            
             showToast('Тестовый заказ создан', '2 разных товара появятся во вкладке "Запросы"');
         }
     </script>
 </body>
 </html>
-
