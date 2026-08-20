@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solaris WMS — Кабинет сборщика</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.0/index.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/playfair-display@5.0.0/index.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sand: '#F5EFE6', cream: '#FDFBF7', sun: '#E89B5A', sunDark: '#C97D3F',
+                        ocean: '#5B8A9A', oceanDark: '#3D6B7A', coral: '#E07A5F', charcoal: '#2C2C2C'
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], serif: ['"Playfair Display"', 'serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; color: #2C2C2C; }
+        .font-serif { font-family: 'Playfair Display', serif; }
+        .tab-btn.active { color: #E89B5A; border-bottom-color: #E89B5A; background: rgba(232, 155, 90, 0.05); }
+        .side-tab-btn.active { background: linear-gradient(135deg, #E89B5A, #C97D3F); color: white; box-shadow: 0 4px 12px rgba(232, 155, 90, 0.3); }
+        .side-tab-btn { transition: all 0.2s ease; }
+        .side-tab-btn:hover:not(.active) { background: rgba(232, 155, 90, 0.1); }
+        @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(232, 155, 90, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(232, 155, 90, 0); } 100% { box-shadow: 0 0 0 0 rgba(232, 155, 90, 0); } }
+        .animate-pulse-ring { animation: pulse-ring 2s infinite; }
+        .slide-in { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .photo-upload { position: relative; overflow: hidden; cursor: pointer; }
+        .photo-upload input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .btn-end-shift { cursor: pointer !important; pointer-events: auto !important; }
+        .auth-form { display: none; }
+        .auth-form.active { display: block; animation: slideIn 0.3s ease-out; }
+        .auth-scroll { max-height: 85vh; overflow-y: auto; }
+        .auth-scroll::-webkit-scrollbar { width: 6px; }
+        .auth-scroll::-webkit-scrollbar-track { background: transparent; }
+        .auth-scroll::-webkit-scrollbar-thumb { background: #E89B5A; border-radius: 4px; }
+        .toggle-switch { position: relative; width: 50px; height: 26px; display: inline-block; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #d1d5db; transition: .3s; border-radius: 26px; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+        input:checked + .toggle-slider { background-color: #E89B5A; }
+        input:checked + .toggle-slider:before { transform: translateX(24px); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="fixed inset-0 z-50 bg-gradient-to-br from-cream via-sand to-cream flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-charcoal/5 auth-scroll">
+            <div class="p-8">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-sun/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#E89B5A" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    </div>
+                    <h2 class="font-serif text-2xl font-bold text-charcoal">Solaris WMS</h2>
+                    <p class="text-charcoal/60 text-sm mt-2">Система управления сборкой заказов</p>
+                </div>
+                <div class="flex bg-charcoal/5 rounded-xl p-1 mb-6">
+                    <button id="tabLogin" onclick="switchAuthTab('login')" class="flex-1 py-2.5 rounded-lg font-semibold text-sm transition-all bg-white text-charcoal shadow-sm">Вход</button>
+                    <button id="tabRegister" onclick="switchAuthTab('register')" class="flex-1 py-2.5 rounded-lg font-semibold text-sm transition-all text-charcoal/60">Регистрация</button>
+                </div>
+                <div id="loginForm" class="auth-form active">
+                    <div class="space-y-4">
+                        <div><label class="text-sm font-medium text-charcoal/70 mb-1 block">Логин</label><input type="text" id="loginLogin" placeholder="Введите логин" class="w-full p-3 border-2 border-charcoal/10 rounded-xl focus:border-sun focus:outline-none"></div>
+                        <div><label class="text-sm font-medium text-charcoal/70 mb-1 block">Пароль</label><input type="password" id="loginPassword" placeholder="Введите пароль" class="w-full p-3 border-2 border-charcoal/10 rounded-xl focus:border-sun focus:outline-none"></div>
+                        <div id="loginError" class="hidden text-red-500 text-xs text-center bg-red-50 p-2 rounded-lg"></div>
+                        <button onclick="doLogin()" class="w-full bg-gradient-to-r from-sun to-sunDark text-white py-3 rounded-xl font-bold hover:shadow-lg transition-all">Войти в систему</button>
+                        <p class="text-xs text-center text-charcoal/50">Нет аккаунта? <button onclick="switchAuthTab('register')" class="text-sun font-semibold hover:underline">Зарегистрироваться</button></p>
+                    </div>
+                </div>
+                <div id="registerForm" class="auth-form">
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 flex gap-2">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" class="flex-shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <p class="text-xs text-blue-800">Запишите логин и пароль в надёжное место. Восстановление пароля не предусмотрено.</p>
+                    </div>
+                    <div class="space-y-3">
+                        <div><label class="text-sm font-medium text-charcoal/70 mb-1 block">ФИО *</label><input type="text" id="regFullName" placeholder="Иванов Иван Иванович" class="w-full p-3 border-2 border-charcoal/10 rounded-xl focus:border-sun focus:outline-none"></div>
+                        <div><label class="text-sm font-medium text-charcoal/70 mb-1 block">Логин *</label><input type="text" id="regLogin" placeholder="Придумайте логин (латиница)" class="w-full p-3 border-2 border-charcoal/10 rounded-xl focus:border-sun focus:outline-none"><p class="text-xs text-charcoal/50 mt-1">Только латинские буквы, цифры и _</p></div>
+                        <div><label class="text-sm font-medium text-charcoal/70 mb-1 block">Пароль *</label><input type="password" id="regPassword" placeholder="Минимум 6 символов" class="w-full p-3 border-2 border-charcoal/10 rounded-xl focus:border-sun focus:outline-none"></div>
+                        <div><label class="text-sm font-medium text-charcoal/70 mb-1 block">Подтверждение пароля *</label><input type="password" id="regPasswordConfirm" placeholder="Повторите пароль" class="w-full p-3 border-2 border-charcoal/10 rounded-xl focus:border-sun focus:outline-none"></div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="text-sm font-medium text-charcoal/70 mb-1 block">Должность</label><input type="text" id="regPosition" value="Сборщик заказов" class="w-full p-3 border-2 border-charcoal/10 rounded-xl focus:border-sun focus:outline-none"></div>
+                            <div><label class="text-sm font-medium text-charcoal/70 mb-1 block">Склад</label><input type="text" id="regWarehouse" value="Склад №1" class="w-full p-3 border-2 border-charcoal/10 rounded-xl focus:border-sun focus:outline-none"></div>
+                        </div>
+                        <div id="registerError" class="hidden text-red-500 text-xs text-center bg-red-50 p-2 rounded-lg"></div>
+                        <button onclick="doRegister()" class="w-full bg-gradient-to-r from-sun to-sunDark text-white py-3 rounded-xl font-bold hover:shadow-lg transition-all">Зарегистрироваться</button>
+                        <p class="text-xs text-center text-charcoal/50">Уже есть аккаунт? <button onclick="switchAuthTab('login')" class="text-sun font-semibold hover:underline">Войти</button></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="hidden flex-1 flex flex-col">
+        <header class="bg-white border-b border-charcoal/10 sticky top-0 z-30 shadow-sm">
+            <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full overflow-hidden border-2 border-sun bg-sand flex-shrink-0">
+                        <img id="headerAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=worker1" alt="Avatar" class="w-full h-full object-cover">
+                    </div>
+                    <div>
+                        <h1 class="font-serif text-lg font-bold text-charcoal" id="headerName">Сборщик</h1>
+                        <p class="text-xs text-charcoal/60 flex items-center gap-2">
+                            <span id="headerPosition">Сборщик заказов</span> • <span id="headerWarehouse">Склад №1</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div id="shiftIndicator" class="hidden items-center gap-2 px-4 py-2 rounded-full font-medium text-sm bg-emerald-100 text-emerald-700 border border-emerald-200">
+                        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <span id="shiftIndicatorText">Смена активна</span>
+                    </div>
+                    <button onclick="logoutWorker()" class="p-2 text-charcoal/60 hover:text-coral transition-colors" title="Выйти">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 max-w-7xl mx-auto w-full px-6 py-6 flex gap-6">
+            <aside class="w-64 flex-shrink-0 hidden md:block">
+                <div class="bg-white rounded-2xl p-3 shadow-sm sticky top-24">
+                    <nav class="space-y-1">
+                        <button class="side-tab-btn active w-full text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3" data-tab="orders" onclick="switchMainTab('orders')">
+                            <span></span> Заказы
+                            <span id="sideCountOrders" class="ml-auto bg-sun text-white text-xs px-2 py-0.5 rounded-full">0</span>
+                        </button>
+                        <button class="side-tab-btn w-full text-left px-4 py-3 rounded-xl font-semibold text-charcoal/70 flex items-center gap-3" data-tab="catalog" onclick="switchMainTab('catalog')">
+                            <span>🏷</span> Каталог
+                        </button>
+                        <button class="side-tab-btn w-full text-left px-4 py-3 rounded-xl font-semibold text-charcoal/70 flex items-center gap-3" data-tab="shift" onclick="switchMainTab('shift')">
+                            <span>⏱</span> Смена
+                        </button>
+                        <button class="side-tab-btn w-full text-left px-4 py-3 rounded-xl font-semibold text-charcoal/70 flex items-center gap-3" data-tab="stats" onclick="switchMainTab('stats')">
+                            <span>📊</span> Статистика
+                        </button>
+                        <button class="side-tab-btn w-full text-left px-4 py-3 rounded-xl font-semibold text-charcoal/70 flex items-center gap-3" data-tab="profile" onclick="switchMainTab('profile')">
+                            <span>👤</span> Профиль
+                        </button>
+                    </nav>
+                </div>
+            </aside>
+
+            <main class="flex-1 min-w-0">
+                <!-- ORDERS TAB -->
+                <div id="tab-orders" class="tab-content">
+                    <div class="bg-charcoal text-white rounded-2xl p-5 mb-6">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="bg-white/10 rounded-xl p-4 backdrop-blur"><p class="text-xs text-white/60 mb-1">Собрано сегодня</p><p class="text-2xl font-bold font-serif" id="statCompleted">0</p></div>
+                            <div class="bg-white/10 rounded-xl p-4 backdrop-blur"><p class="text-xs text-white/60 mb-1">Среднее время</p><p class="text-2xl font-bold font-serif" id="statAvgTime">--:--</p></div>
+                            <div class="bg-white/10 rounded-xl p-4 backdrop-blur"><p class="text-xs text-white/60 mb-1">Эффективность</p><p class="text-2xl font-bold font-serif text-sun" id="statEfficiency">0%</p></div>
+                            <div class="bg-white/10 rounded-xl p-4 backdrop-blur"><p class="text-xs text-white/60 mb-1">Обеды сегодня</p><p class="text-2xl font-bold font-serif" id="statLunchTime">0 мин <span class="text-sm font-sans font-normal text-white/60" id="statLunchCount">(0)</span></p></div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm mb-4">
+                        <div class="flex border-b border-charcoal/10">
+                            <button class="tab-btn active flex-1 py-4 text-center font-semibold text-charcoal/60 border-b-2 border-transparent transition-all" data-subtab="requests" onclick="switchOrderTab('requests')">📥 Запросы на сборку <span id="countRequests" class="ml-1 bg-sun text-white text-xs px-2 py-0.5 rounded-full">0</span></button>
+                            <button class="tab-btn flex-1 py-4 text-center font-semibold text-charcoal/60 border-b-2 border-transparent transition-all" data-subtab="active" onclick="switchOrderTab('active')"> Активные <span id="countActive" class="ml-1 bg-ocean text-white text-xs px-2 py-0.5 rounded-full">0</span></button>
+                            <button class="tab-btn flex-1 py-4 text-center font-semibold text-charcoal/60 border-b-2 border-transparent transition-all" data-subtab="completed" onclick="switchOrderTab('completed')">✅ Выполненные <span id="countCompleted" class="ml-1 bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full">0</span></button>
+                        </div>
+                    </div>
+                    <div id="subtab-requests" class="subtab-content space-y-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <p class="text-sm text-charcoal/60">Заказы, готовые к сборке (30+ минут с оформления)</p>
+                            <button onclick="createTestOrder()" class="text-xs bg-charcoal/5 hover:bg-charcoal/10 text-charcoal px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">🛠 Тестовый заказ (35 мин)</button>
+                        </div>
+                        <div id="requestsList" class="space-y-4"></div>
+                        <div id="emptyRequests" class="hidden text-center py-16 bg-white rounded-2xl border border-dashed border-charcoal/20"><p class="text-charcoal/50">Нет новых запросов на сборку</p></div>
+                    </div>
+                    <div id="subtab-active" class="subtab-content hidden space-y-4">
+                        <div id="activeList" class="space-y-4"></div>
+                        <div id="emptyActive" class="hidden text-center py-16 bg-white rounded-2xl border border-dashed border-charcoal/20"><p class="text-charcoal/50">Нет активных заказов в работе</p></div>
+                    </div>
+                    <div id="subtab-completed" class="subtab-content hidden space-y-4">
+                        <div id="completedList" class="space-y-4"></div>
+                        <div id="emptyCompleted" class="hidden text-center py-16 bg-white rounded-2xl border border-dashed border-charcoal/20"><p class="text-charcoal/50">История выполненных заказов пуста</p></div>
+                    </div>
+                </div>
+
+                <!-- CATALOG TAB -->
+                <div id="tab-catalog" class="tab-content hidden">
+                    <div class="bg-white rounded-2xl shadow-sm p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h2 class="font-serif text-2xl font-bold text-charcoal">Управление каталогом</h2>
+                                <p class="text-sm text-charcoal/60 mt-1">Переключайте наличие товаров. Изменения мгновенно отражаются на сайте.</p>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs text-charcoal/60 bg-sun/10 px-3 py-2 rounded-lg">
+                                <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                                Синхронизация активна
+                            </div>
+                        </div>
+                        <div id="catalogManagementList" class="space-y-3"></div>
+                    </div>
+                </div>
+
+                <!-- SHIFT TAB -->
+                <div id="tab-shift" class="tab-content hidden">
+                    <div class="bg-white rounded-2xl shadow-sm p-6 mb-6">
+                        <h2 class="font-serif text-2xl font-bold text-charcoal mb-6">Управление сменой</h2>
+                        <div class="bg-charcoal/5 rounded-2xl p-6 mb-6">
+                            <div class="flex items-center justify-between flex-wrap gap-4">
+                                <div>
+                                    <p class="text-sm text-charcoal/60 mb-1">Текущий статус</p>
+                                    <p id="shiftStatusText" class="font-serif text-2xl font-bold text-charcoal">Смена не начата</p>
+                                    <p id="shiftDurationText" class="text-sm text-charcoal/60 mt-1">—</p>
+                                </div>
+                                <div class="flex gap-3">
+                                    <button id="btnStartShift" onclick="startShift()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold transition-colors flex items-center gap-2">▶ Принять смену</button>
+                                    <button id="btnEndShift" onclick="endShift()" class="hidden bg-coral hover:bg-red-600 text-white px-6 py-3 rounded-xl font-bold transition-colors flex items-center gap-2 btn-end-shift">⏹ Завершить смену</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-charcoal mb-3">История смен</h3>
+                            <div id="shiftHistoryList" class="space-y-2"></div>
+                            <div id="emptyShiftHistory" class="text-center py-8 text-charcoal/50 text-sm">История смен пуста</div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm p-6">
+                        <h2 class="font-serif text-2xl font-bold text-charcoal mb-6">Перерывы на обед</h2>
+                        <div id="lunchStatusBox" class="bg-sand/30 rounded-2xl p-6 mb-6">
+                            <div class="flex items-center justify-between flex-wrap gap-4">
+                                <div>
+                                    <p class="text-sm text-charcoal/60 mb-1">Статус перерыва</p>
+                                    <p id="lunchStatusText" class="font-serif text-2xl font-bold text-charcoal">На рабочем месте</p>
+                                    <p id="lunchDurationText" class="text-sm text-charcoal/60 mt-1">—</p>
+                                </div>
+                                <button id="btnLunch" onclick="toggleLunch()" class="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-xl font-bold transition-colors flex items-center gap-2"><span>☕</span><span id="btnLunchText">На обед</span></button>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-charcoal mb-3">Перерывы сегодня</h3>
+                            <div id="lunchList" class="space-y-2"></div>
+                            <div id="emptyLunchList" class="text-center py-8 text-charcoal/50 text-sm">Перерывов сегодня не было</div>
+                            <div class="mt-4 pt-4 border-t border-charcoal/10 flex justify-between items-center"><span class="text-sm text-charcoal/60">Всего перерывов</span><span id="totalLunchesToday" class="font-bold text-charcoal">0</span></div>
+                            <div class="flex justify-between items-center mt-2"><span class="text-sm text-charcoal/60">Общее время на обедах</span><span id="totalLunchTimeToday" class="font-bold text-charcoal">0 мин</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STATS TAB -->
+                <div id="tab-stats" class="tab-content hidden">
+                    <div class="bg-white rounded-2xl shadow-sm p-6 mb-6">
+                        <h2 class="font-serif text-2xl font-bold text-charcoal mb-6">Продуктивность сотрудника</h2>
+                        <div class="grid md:grid-cols-3 gap-4 mb-6">
+                            <div class="bg-gradient-to-br from-sun/10 to-sun/5 rounded-2xl p-6 border border-sun/20"><p class="text-sm text-charcoal/60 mb-2">Эффективность смены</p><p class="text-4xl font-bold font-serif text-sun" id="statsEfficiency">0%</p><p class="text-xs text-charcoal/50 mt-2">Целевое время: 10 мин/заказ</p></div>
+                            <div class="bg-gradient-to-br from-ocean/10 to-ocean/5 rounded-2xl p-6 border border-ocean/20"><p class="text-sm text-charcoal/60 mb-2">Среднее время сборки</p><p class="text-4xl font-bold font-serif text-ocean" id="statsAvgTime">--:--</p><p class="text-xs text-charcoal/50 mt-2">За текущий день</p></div>
+                            <div class="bg-gradient-to-br from-emerald-100 to-emerald-50 rounded-2xl p-6 border border-emerald-200"><p class="text-sm text-charcoal/60 mb-2">Выполнено заказов</p><p class="text-4xl font-bold font-serif text-emerald-600" id="statsCompleted">0</p><p class="text-xs text-charcoal/50 mt-2">За текущий день</p></div>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="bg-charcoal/5 rounded-2xl p-5"><h4 class="font-semibold text-charcoal mb-3">Лучшее время сборки</h4><p class="text-3xl font-bold font-serif text-charcoal" id="statsBestTime">--:--</p><p class="text-xs text-charcoal/50 mt-1" id="statsBestTimeOrder">—</p></div>
+                            <div class="bg-charcoal/5 rounded-2xl p-5"><h4 class="font-semibold text-charcoal mb-3">Худшее время сборки</h4><p class="text-3xl font-bold font-serif text-charcoal" id="statsWorstTime">--:--</p><p class="text-xs text-charcoal/50 mt-1" id="statsWorstTimeOrder">—</p></div>
+                            <div class="bg-charcoal/5 rounded-2xl p-5"><h4 class="font-semibold text-charcoal mb-3">Всего собрано за всё время</h4><p class="text-3xl font-bold font-serif text-charcoal" id="statsTotalCompleted">0</p><p class="text-xs text-charcoal/50 mt-1">Начиная с первого рабочего дня</p></div>
+                            <div class="bg-charcoal/5 rounded-2xl p-5"><h4 class="font-semibold text-charcoal mb-3">Время на обедах (сегодня)</h4><p class="text-3xl font-bold font-serif text-charcoal" id="statsLunchTotal">0 мин</p><p class="text-xs text-charcoal/50 mt-1" id="statsLunchBreaks">0 перерывов</p></div>
+                        </div>
+                        <div class="mt-6 bg-blue-50 border border-blue-100 rounded-2xl p-5">
+                            <h4 class="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                Как рассчитывается эффективность
+                            </h4>
+                            <p class="text-sm text-blue-900/80 leading-relaxed">Целевое время сборки одного заказа — <strong>10 минут</strong>. Эффективность = (10 мин / ваше среднее время) × 100%. Если вы собираете заказ за 8 минут — эффективность 125%. Если за 15 минут — 67%. При отсутствии заказов эффективность равна 0%.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PROFILE TAB -->
+                <div id="tab-profile" class="tab-content hidden">
+                    <div class="bg-white rounded-2xl shadow-sm p-6">
+                        <h2 class="font-serif text-2xl font-bold text-charcoal mb-6">Профиль сотрудника</h2>
+                        <div class="flex flex-col md:flex-row gap-8">
+                            <div class="flex-shrink-0">
+                                <label class="photo-upload block">
+                                    <div class="w-40 h-40 rounded-full overflow-hidden border-4 border-sun bg-sand flex items-center justify-center">
+                                        <img id="profileAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=worker1" alt="Фото" class="w-full h-full object-cover">
+                                    </div>
+                                    <input type="file" accept="image/*" onchange="handlePhotoUpload(event)">
+                                </label>
+                                <p class="text-xs text-center text-charcoal/60 mt-2">Нажмите, чтобы загрузить фото</p>
+                            </div>
+                            <div class="flex-1 space-y-4">
+                                <div><label class="text-sm font-medium text-charcoal/70 mb-1 block">ФИО сотрудника *</label><input type="text" id="profileFullName" placeholder="Иванов Иван Иванович" class="w-full p-3 border-2 border-charcoal/10 rounded-xl focus:border-sun outline-none"></div>
+                                <div class="grid md:grid-cols-2 gap-4">
+                                    <div><label class="text-sm font-medium text-charcoal/70 mb-1 block">Должность</label><input type="text" id="profilePosition" placeholder="Сборщик заказов" class="w-full p-3 border-2 border-charcoal/10 rounded-xl focus:border-sun outline-none"></div>
+                                    <div><label class="text-sm font-medium text-charcoal/70 mb-1 block">Номер склада</label><input type="text" id="profileWarehouse" placeholder="Склад №1" class="w-full p-3 border-2 border-charcoal/10 rounded-xl focus:border-sun outline-none"></div>
+                                </div>
+                                <div><label class="text-sm font-medium text-charcoal/70 mb-1 block">Логин (неизменяемый)</label><input type="text" id="profileLogin" readonly class="w-full p-3 border-2 border-charcoal/5 rounded-xl bg-charcoal/5 text-charcoal/60 cursor-not-allowed"><p class="text-xs text-charcoal/50 mt-1">Логин назначается при создании аккаунта и не может быть изменён</p></div>
+                                <div class="pt-4 flex gap-3"><button onclick="saveProfile()" class="bg-sun hover:bg-sunDark text-white px-6 py-3 rounded-xl font-bold transition-colors">Сохранить изменения</button></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        const PRODUCTS = [
+            { id: 1, name: 'Solaris SPF 50+', price: 2490, image: 'https://image.qwenlm.ai/public_source/89dc7435-d66c-4de0-94d3-f9cf72469b25/173ac74b0-a08a-4432-9bb0-87c9281b0b33.png', volume: '50 мл', desc: 'Максимальная защита от солнца для лица и тела' },
+            { id: 2, name: 'Solaris SPF 30', price: 1890, image: 'https://image.qwenlm.ai/public_source/89dc7435-d66c-4de0-94d3-f9cf72469b25/103f1eed8-c9d8-9647-be0c-f6a1fc6df165.png', volume: '100 мл', desc: 'Лёгкая ежедневная защита для городской среды' },
+            { id: 3, name: 'Solaris After Sun Gel', price: 1290, image: 'https://image.qwenlm.ai/public_source/89dc7435-d66c-4de0-94d3-f9cf72469b25/1695cc96d-44b9-41d2-a23a-cbb893cc7e1c.png', volume: '200 мл', desc: 'Восстанавливающий гель с алоэ вера после солнца' },
+            { id: 4, name: 'Solaris Lip Balm SPF 15', price: 490, image: 'https://image.qwenlm.ai/public_source/89dc7435-d66c-4de0-94d3-f9cf72469b25/16d21e004-3eb7-958e-ba3b-549636a10502.png', volume: '4.5 г', desc: 'Защитный бальзам для губ с SPF 15' }
+        ];
+
+        let currentWorker = null;
+        let activeTimersInterval = null;
+        let shiftTimerInterval = null;
+        let lunchTimerInterval = null;
+        let syncChannel = null;
+        const TARGET_TIME_PER_ORDER = 10 * 60 * 1000;
+
+        // ========== BROADCAST CHANNEL ==========
+        function initSyncChannel() {
+            if (typeof BroadcastChannel !== 'undefined') {
+                syncChannel = new BroadcastChannel('solaris_sync');
+                syncChannel.onmessage = (event) => {
+                    const data = event.data;
+                    if (data.type === 'catalog_update') {
+                        renderCatalogManagement();
+                    } else if (data.type === 'order_created') {
+                        renderAllTabs();
+                        updateStats();
+                    }
+                };
+            }
+        }
+
+        function broadcastCatalogUpdate() {
+            if (syncChannel) {
+                syncChannel.postMessage({ type: 'catalog_update', timestamp: Date.now() });
+            }
+            const availability = getProductAvailability();
+            localStorage.setItem('solaris_product_availability', JSON.stringify(availability));
+        }
+
+        // ========== PRODUCT AVAILABILITY ==========
+        function getProductAvailability() {
+            const stored = localStorage.getItem('solaris_product_availability');
+            if (stored) return JSON.parse(stored);
+            const defaults = {};
+            PRODUCTS.forEach(p => defaults[p.id] = true);
+            localStorage.setItem('solaris_product_availability', JSON.stringify(defaults));
+            return defaults;
+        }
+
+        function toggleProductAvailability(productId) {
+            const availability = getProductAvailability();
+            availability[productId] = !availability[productId];
+            localStorage.setItem('solaris_product_availability', JSON.stringify(availability));
+            broadcastCatalogUpdate();
+            renderCatalogManagement();
+            showToast('Каталог обновлён', `${PRODUCTS.find(p => p.id === productId).name}: ${availability[productId] ? 'В наличии' : 'Нет в наличии'}`);
+        }
+
+        // ========== INIT ==========
+        document.addEventListener('DOMContentLoaded', () => {
+            initSyncChannel();
+            checkAuth();
+            window.addEventListener('storage', (e) => {
+                if (e.key && (e.key.startsWith('solaris_orders') || e.key.startsWith('solaris_messages'))) {
+                    renderAllTabs();
+                    updateStats();
+                }
+                if (e.key === 'solaris_product_availability') {
+                    renderCatalogManagement();
+                }
+            });
+        });
+
+        function checkAuth() {
+            const workerStr = localStorage.getItem('solaris_current_worker');
+            if (workerStr) {
+                try {
+                    currentWorker = JSON.parse(workerStr);
+                    migrateWorkerData();
+                    showDashboard();
+                } catch (e) {
+                    localStorage.removeItem('solaris_current_worker');
+                    document.getElementById('loginScreen').classList.remove('hidden');
+                    document.getElementById('dashboard').classList.add('hidden');
+                }
+            } else {
+                document.getElementById('loginScreen').classList.remove('hidden');
+                document.getElementById('dashboard').classList.add('hidden');
+            }
+        }
+
+        function migrateWorkerData() {
+            if (!currentWorker) return;
+            let changed = false;
+            if (!Array.isArray(currentWorker.shifts)) { currentWorker.shifts = []; changed = true; }
+            if (!Array.isArray(currentWorker.lunchBreaks)) { currentWorker.lunchBreaks = []; changed = true; }
+            if (!Array.isArray(currentWorker.declinedOrders)) { currentWorker.declinedOrders = []; changed = true; }
+            if (currentWorker.currentShift === undefined) { currentWorker.currentShift = null; changed = true; }
+            if (currentWorker.isOnLunch === undefined) { currentWorker.isOnLunch = false; changed = true; }
+            if (!currentWorker.fullName) { currentWorker.fullName = 'Сборщик ' + currentWorker.login; changed = true; }
+            if (!currentWorker.position) { currentWorker.position = 'Сборщик заказов'; changed = true; }
+            if (!currentWorker.warehouse) { currentWorker.warehouse = 'Склад №1'; changed = true; }
+            if (changed) updateWorkerData();
+        }
+
+        function switchAuthTab(tab) {
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            const tabLogin = document.getElementById('tabLogin');
+            const tabRegister = document.getElementById('tabRegister');
+            document.getElementById('loginError').classList.add('hidden');
+            document.getElementById('registerError').classList.add('hidden');
+            if (tab === 'login') {
+                loginForm.classList.add('active');
+                registerForm.classList.remove('active');
+                tabLogin.classList.add('bg-white', 'text-charcoal', 'shadow-sm');
+                tabLogin.classList.remove('text-charcoal/60');
+                tabRegister.classList.remove('bg-white', 'text-charcoal', 'shadow-sm');
+                tabRegister.classList.add('text-charcoal/60');
+            } else {
+                loginForm.classList.remove('active');
+                registerForm.classList.add('active');
+                tabRegister.classList.add('bg-white', 'text-charcoal', 'shadow-sm');
+                tabRegister.classList.remove('text-charcoal/60');
+                tabLogin.classList.remove('bg-white', 'text-charcoal', 'shadow-sm');
+                tabLogin.classList.add('text-charcoal/60');
+            }
+        }
+
+        function doLogin() {
+            const login = document.getElementById('loginLogin').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errorEl = document.getElementById('loginError');
+            errorEl.classList.add('hidden');
+            if (!login || !password) { errorEl.textContent = 'Заполните все поля'; errorEl.classList.remove('hidden'); return; }
+            const workers = JSON.parse(localStorage.getItem('solaris_workers') || '[]');
+            const worker = workers.find(w => w.login === login && w.password === password);
+            if (!worker) { errorEl.textContent = 'Неверный логин или пароль'; errorEl.classList.remove('hidden'); return; }
+            currentWorker = worker;
+            migrateWorkerData();
+            localStorage.setItem('solaris_current_worker', JSON.stringify(currentWorker));
+            showDashboard();
+        }
+
+        function doRegister() {
+            const fullName = document.getElementById('regFullName').value.trim();
+            const login = document.getElementById('regLogin').value.trim();
+            const password = document.getElementById('regPassword').value;
+            const passwordConfirm = document.getElementById('regPasswordConfirm').value;
+            const position = document.getElementById('regPosition').value.trim() || 'Сборщик заказов';
+            const warehouse = document.getElementById('regWarehouse').value.trim() || 'Склад №1';
+            const errorEl = document.getElementById('registerError');
+            errorEl.classList.add('hidden');
+            if (!fullName || !login || !password || !passwordConfirm) { errorEl.textContent = 'Заполните все обязательные поля'; errorEl.classList.remove('hidden'); return; }
+            if (fullName.length < 3) { errorEl.textContent = 'ФИО должно содержать минимум 3 символа'; errorEl.classList.remove('hidden'); return; }
+            if (!/^[a-zA-Z0-9_]+$/.test(login)) { errorEl.textContent = 'Логин должен содержать только латинские буквы, цифры и _'; errorEl.classList.remove('hidden'); return; }
+            if (login.length < 3) { errorEl.textContent = 'Логин должен быть не менее 3 символов'; errorEl.classList.remove('hidden'); return; }
+            if (password.length < 6) { errorEl.textContent = 'Пароль должен быть не менее 6 символов'; errorEl.classList.remove('hidden'); return; }
+            if (password !== passwordConfirm) { errorEl.textContent = 'Пароли не совпадают'; errorEl.classList.remove('hidden'); return; }
+            const workers = JSON.parse(localStorage.getItem('solaris_workers') || '[]');
+            if (workers.some(w => w.login === login)) { errorEl.textContent = 'Этот логин уже занят. Выберите другой.'; errorEl.classList.remove('hidden'); return; }
+            const newWorker = {
+                login: login,
+                password: password,
+                fullName: fullName,
+                position: position,
+                warehouse: warehouse,
+                photo: null,
+                declinedOrders: [],
+                lunchBreaks: [],
+                shifts: [],
+                currentShift: null,
+                isOnLunch: false,
+                joinedAt: Date.now()
+            };
+            workers.push(newWorker);
+            localStorage.setItem('solaris_workers', JSON.stringify(workers));
+            currentWorker = newWorker;
+            localStorage.setItem('solaris_current_worker', JSON.stringify(currentWorker));
+            showToast('Регистрация успешна!', `Добро пожаловать, ${fullName}!`);
+            showDashboard();
+        }
+
+        function logoutWorker() {
+            localStorage.removeItem('solaris_current_worker');
+            currentWorker = null;
+            clearInterval(activeTimersInterval);
+            clearInterval(shiftTimerInterval);
+            clearInterval(lunchTimerInterval);
+            document.getElementById('loginLogin').value = '';
+            document.getElementById('loginPassword').value = '';
+            document.getElementById('loginError').classList.add('hidden');
+            checkAuth();
+        }
+
+        function showDashboard() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            updateHeaderInfo();
+            updateShiftUI();
+            updateLunchUI();
+            renderAllTabs();
+            updateStats();
+            clearInterval(activeTimersInterval);
+            clearInterval(shiftTimerInterval);
+            clearInterval(lunchTimerInterval);
+            activeTimersInterval = setInterval(updateActiveTimers, 1000);
+            shiftTimerInterval = setInterval(updateShiftTimer, 1000);
+            lunchTimerInterval = setInterval(updateLunchTimer, 1000);
+        }
+
+        function updateHeaderInfo() {
+            document.getElementById('headerName').textContent = currentWorker.fullName;
+            document.getElementById('headerPosition').textContent = currentWorker.position;
+            document.getElementById('headerWarehouse').textContent = currentWorker.warehouse;
+            const avatar = currentWorker.photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentWorker.login}`;
+            document.getElementById('headerAvatar').src = avatar;
+        }
+
+        function switchMainTab(tabName) {
+            document.querySelectorAll('.side-tab-btn').forEach(btn => {
+                if (btn.dataset.tab === tabName) { btn.classList.add('active'); btn.classList.remove('text-charcoal/70'); }
+                else { btn.classList.remove('active'); btn.classList.add('text-charcoal/70'); }
+            });
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            if (tabName === 'profile') loadProfileForm();
+            if (tabName === 'shift') { updateShiftUI(); updateLunchUI(); renderShiftHistory(); renderLunchList(); }
+            if (tabName === 'stats') updateDetailedStats();
+            if (tabName === 'catalog') renderCatalogManagement();
+        }
+
+        function switchOrderTab(subtab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => { if (btn.dataset.subtab === subtab) btn.classList.add('active'); else btn.classList.remove('active'); });
+            document.querySelectorAll('.subtab-content').forEach(content => content.classList.add('hidden'));
+            document.getElementById(`subtab-${subtab}`).classList.remove('hidden');
+            renderAllTabs();
+        }
+
+        // ========== ORDERS - ВСЕМ СОТРУДНИКАМ ==========
+        function getOrders() {
+            let allOrders = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('solaris_orders_')) {
+                    try {
+                        const userOrders = JSON.parse(localStorage.getItem(key));
+                        if (Array.isArray(userOrders)) {
+                            allOrders = allOrders.concat(userOrders);
+                        }
+                    } catch (e) {}
+                }
+            }
+            return allOrders.sort((a, b) => b.createdAt - a.createdAt);
+        }
+
+        function saveOrderUpdates(updatedOrders) {
+            updatedOrders.forEach(order => {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('solaris_orders_')) {
+                        try {
+                            let userOrders = JSON.parse(localStorage.getItem(key));
+                            if (!Array.isArray(userOrders)) continue;
+                            const idx = userOrders.findIndex(o => o.id === order.id);
+                            if (idx !== -1) {
+                                userOrders[idx] = order;
+                                localStorage.setItem(key, JSON.stringify(userOrders));
+                                break;
+                            }
+                        } catch (e) {}
+                    }
+                }
+            });
+            window.dispatchEvent(new Event('storage'));
+        }
+
+        function addMessageToCustomer(orderId, text) {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('solaris_orders_')) {
+                    try {
+                        const userOrders = JSON.parse(localStorage.getItem(key));
+                        if (!Array.isArray(userOrders)) continue;
+                        const order = userOrders.find(o => o.id === orderId);
+                        if (order) {
+                            const msgKey = key.replace('solaris_orders_', 'solaris_messages_');
+                            let messages = JSON.parse(localStorage.getItem(msgKey) || '[]');
+                            if (!Array.isArray(messages)) messages = [];
+                            if (!messages.some(m => m.orderId === orderId && m.text === text)) {
+                                messages.unshift({
+                                    id: Date.now() + Math.random(),
+                                    orderId: orderId,
+                                    text: text,
+                                    date: new Date().toLocaleString('ru-RU'),
+                                    read: false
+                                });
+                                localStorage.setItem(msgKey, JSON.stringify(messages));
+                            }
+                            break;
+                        }
+                    } catch (e) {}
+                }
+            }
+            window.dispatchEvent(new Event('storage'));
+        }
+
+        function updateWorkerData() {
+            if (!currentWorker) return;
+            localStorage.setItem('solaris_current_worker', JSON.stringify(currentWorker));
+            let workers = JSON.parse(localStorage.getItem('solaris_workers') || '[]');
+            if (!Array.isArray(workers)) workers = [];
+            const idx = workers.findIndex(w => w.login === currentWorker.login);
+            if (idx !== -1) { workers[idx] = currentWorker; localStorage.setItem('solaris_workers', JSON.stringify(workers)); }
+        }
+
+        function renderAllTabs() {
+            if (!currentWorker) return;
+            const orders = getOrders();
+            const now = Date.now();
+            const thirtyMins = 30 * 60 * 1000;
+            const requests = [], active = [], completed = [];
+            orders.forEach(order => {
+                const isOldEnough = (now - order.createdAt) > thirtyMins;
+                const isDeclinedByMe = currentWorker.declinedOrders.includes(order.id);
+                if (order.status === 'В обработке' && isOldEnough && !order.workerId && !isDeclinedByMe) requests.push(order);
+                else if (order.workerId === currentWorker.login && order.status === 'В сборке') active.push(order);
+                else if (order.workerId === currentWorker.login && ['Готов к выдаче', 'Передаём курьеру', 'Выполнен'].includes(order.status)) completed.push(order);
+            });
+            renderList('requestsList', 'emptyRequests', requests, renderRequestCard);
+            renderList('activeList', 'emptyActive', active, renderActiveCard);
+            renderList('completedList', 'emptyCompleted', completed, renderCompletedCard);
+            document.getElementById('countRequests').textContent = requests.length;
+            document.getElementById('countActive').textContent = active.length;
+            document.getElementById('countCompleted').textContent = completed.length;
+            document.getElementById('sideCountOrders').textContent = active.length + requests.length;
+        }
+
+        function renderList(containerId, emptyId, data, cardRenderer) {
+            const container = document.getElementById(containerId);
+            const empty = document.getElementById(emptyId);
+            if (data.length === 0) { container.innerHTML = ''; container.classList.add('hidden'); empty.classList.remove('hidden'); }
+            else { container.classList.remove('hidden'); empty.classList.add('hidden'); container.innerHTML = data.map(cardRenderer).join(''); }
+        }
+
+        function renderRequestCard(order) {
+            const waitTime = Math.floor((Date.now() - order.createdAt) / 60000);
+            const itemsHtml = order.items.map(item => `
+                <div class="flex items-center gap-3 bg-white p-3 rounded-xl border border-charcoal/5 mb-2">
+                    <img src="${item.image}" class="w-14 h-16 object-cover rounded-lg bg-sand flex-shrink-0" alt="${item.name}">
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-charcoal text-sm">${item.name}</p>
+                        <p class="text-xs text-charcoal/60">${item.volume} • ${item.desc}</p>
+                        <p class="text-xs font-bold text-sun mt-1">${item.qty} шт. × ${item.price.toLocaleString()} ₽</p>
+                    </div>
+                </div>
+            `).join('');
+            return `
+                <div class="bg-white rounded-2xl p-5 border border-charcoal/5 shadow-sm slide-in hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 class="font-bold text-charcoal text-lg">${order.id}</h4>
+                            <p class="text-xs text-charcoal/60">Оформлен: ${order.date} (ожидает ${waitTime} мин)</p>
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Ожидает сборки</span>
+                    </div>
+                    <div class="bg-sand/30 rounded-xl p-3 mb-4">
+                        <p class="text-xs font-semibold text-charcoal/70 mb-2">Состав заказа:</p>
+                        ${itemsHtml}
+                        <p class="text-xs text-charcoal/60 mt-2"><strong>Тип:</strong> ${order.delivery} ${order.delivery === 'Доставка курьером' ? `(${order.deliveryAddress})` : ''}</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="acceptOrder('${order.id}')" class="flex-1 bg-sun text-white py-2.5 rounded-xl font-semibold hover:bg-sunDark transition-colors flex items-center justify-center gap-2">Принять в работу</button>
+                        <button onclick="declineOrder('${order.id}')" class="px-4 py-2.5 border-2 border-charcoal/10 rounded-xl font-semibold text-charcoal/60 hover:border-coral hover:text-coral transition-colors">Отказаться</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderActiveCard(order) {
+            const itemsHtml = order.items.map(item => `
+                <div class="flex items-center gap-3 bg-white p-3 rounded-xl border border-charcoal/5">
+                    <img src="${item.image}" class="w-14 h-16 object-cover rounded-lg bg-sand flex-shrink-0" alt="${item.name}">
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-charcoal text-sm">${item.name}</p>
+                        <p class="text-xs text-charcoal/60">${item.volume} • ${item.desc}</p>
+                        <p class="text-xs font-bold text-sun mt-1">${item.qty} шт. × ${item.price.toLocaleString()} ₽</p>
+                    </div>
+                </div>
+            `).join('');
+            return `
+                <div class="bg-white rounded-2xl p-5 border-l-4 border-l-ocean shadow-sm slide-in">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h4 class="font-bold text-charcoal text-lg">${order.id}</h4>
+                            <p class="text-xs text-charcoal/60">Клиент: ${order.deliveryAddress || 'Самовывоз'}</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-ocean/10 text-ocean mb-1 inline-block">В сборке</span>
+                            <p class="text-lg font-mono font-bold text-ocean" id="timer-${order.id}">00:00</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 mb-5">${itemsHtml}</div>
+                    <button onclick="completeOrder('${order.id}')" class="w-full bg-emerald-500 text-white py-3 rounded-xl font-bold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2 animate-pulse-ring">✓ Товар готов к ${order.delivery === 'Самовывоз' ? 'выдаче' : 'отправке'}</button>
+                </div>
+            `;
+        }
+
+        function renderCompletedCard(order) {
+            const finishTime = order.completedAt ? new Date(order.completedAt).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'}) : '--:--';
+            const duration = order.pickingDuration ? formatDuration(order.pickingDuration) : 'Н/Д';
+            let statusClass = 'bg-emerald-100 text-emerald-700', statusText = 'Выполнен';
+            if (order.status === 'Готов к выдаче') { statusText = 'Ожидает клиента'; statusClass = 'bg-blue-100 text-blue-700'; }
+            if (order.status === 'Передаём курьеру') { statusText = 'Передан курьеру'; statusClass = 'bg-purple-100 text-purple-700'; }
+            const itemsHtml = order.items.map(item => `
+                <div class="flex items-center gap-3 bg-white p-2 rounded-lg border border-charcoal/5">
+                    <img src="${item.image}" class="w-10 h-12 object-cover rounded bg-sand">
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium text-charcoal text-xs truncate">${item.name}</p>
+                        <p class="text-xs text-charcoal/60">${item.volume} • ${item.qty} шт.</p>
+                    </div>
+                </div>
+            `).join('');
+            return `
+                <div class="bg-white rounded-2xl p-5 border border-charcoal/5 opacity-75 hover:opacity-100 transition-opacity">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-charcoal">${order.id}</h4>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold ${statusClass}">${statusText}</span>
+                    </div>
+                    <div class="flex justify-between text-sm text-charcoal/60 mb-3">
+                        <span>Завершен в: ${finishTime}</span>
+                        <span>Время сборки: ${duration}</span>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">${itemsHtml}</div>
+                </div>
+            `;
+        }
+
+        function acceptOrder(orderId) {
+            const orders = getOrders();
+            const order = orders.find(o => o.id === orderId);
+            if (!order) return;
+            order.workerId = currentWorker.login;
+            order.status = 'В сборке';
+            order.acceptedAt = Date.now();
+            saveOrderUpdates([order]);
+            addMessageToCustomer(orderId, `✅ Ваш заказ ${orderId} принят в сборку. Сотрудник склада приступил к работе.`);
+            switchOrderTab('active');
+        }
+
+        function declineOrder(orderId) {
+            if (!currentWorker.declinedOrders.includes(orderId)) {
+                currentWorker.declinedOrders.push(orderId);
+                updateWorkerData();
+                renderAllTabs();
+            }
+        }
+
+        function completeOrder(orderId) {
+            const orders = getOrders();
+            const order = orders.find(o => o.id === orderId);
+            if (!order) return;
+            const pickingDuration = Date.now() - order.acceptedAt;
+            order.pickingDuration = pickingDuration;
+            order.completedAt = Date.now();
+            if (order.delivery === 'Самовывоз') {
+                order.status = 'Готов к выдаче';
+                addMessageToCustomer(orderId, `🎉 Ваш заказ ${orderId} готов к выдаче! Ждём вас по адресу: ${order.deliveryAddress}`);
+            } else {
+                order.status = 'Передаём курьеру';
+                addMessageToCustomer(orderId, `🚚 Заказ ${orderId} собран и передаётся курьеру. Доставка в течение 1-2 часов.`);
+            }
+            saveOrderUpdates([order]);
+            updateStats();
+            switchOrderTab('completed');
+        }
+
+        function updateActiveTimers() {
+            if (!currentWorker) return;
+            const orders = getOrders();
+            const active = orders.filter(o => o.workerId === currentWorker.login && o.status === 'В сборке');
+            active.forEach(order => {
+                const elapsed = Date.now() - order.acceptedAt;
+                const timerEl = document.getElementById(`timer-${order.id}`);
+                if (timerEl) timerEl.textContent = formatDuration(elapsed);
+            });
+        }
+
+        function formatDuration(ms) {
+            const totalSecs = Math.floor(ms / 1000);
+            const mins = Math.floor(totalSecs / 60);
+            const secs = totalSecs % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // ========== CATALOG MANAGEMENT ==========
+        function renderCatalogManagement() {
+            const availability = getProductAvailability();
+            const container = document.getElementById('catalogManagementList');
+            container.innerHTML = PRODUCTS.map(p => {
+                const isAvailable = availability[p.id] !== false;
+                return `
+                    <div class="bg-charcoal/5 rounded-2xl p-4 flex items-center gap-4 slide-in">
+                        <img src="${p.image}" alt="${p.name}" class="w-16 h-20 object-cover rounded-xl bg-white shadow-sm">
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-serif font-bold text-charcoal">${p.name}</h4>
+                            <p class="text-xs text-charcoal/60">${p.volume} • ${p.price.toLocaleString()} ₽</p>
+                            <p class="text-xs text-charcoal/50 mt-1 truncate">${p.desc}</p>
+                        </div>
+                        <div class="flex items-center gap-3 flex-shrink-0">
+                            <span class="text-sm font-medium ${isAvailable ? 'text-emerald-600' : 'text-red-600'}">
+                                ${isAvailable ? '✓ В наличии' : '✗ Нет в наличии'}
+                            </span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" ${isAvailable ? 'checked' : ''} onchange="toggleProductAvailability(${p.id})">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ========== SHIFT ==========
+        function startShift() {
+            if (currentWorker.currentShift) { showToast('Смена уже активна', 'Сначала завершите текущую смену'); return; }
+            currentWorker.currentShift = { start: Date.now(), end: null };
+            updateWorkerData();
+            updateShiftUI();
+            renderShiftHistory();
+            showToast('Смена начата', 'Удачной работы!');
+        }
+
+        function endShift() {
+            if (!currentWorker.currentShift) { showToast('Смена не активна', 'Сначала примите смену'); return; }
+            if (currentWorker.isOnLunch) {
+                const currentLunch = currentWorker.lunchBreaks[currentWorker.lunchBreaks.length - 1];
+                if (currentLunch && !currentLunch.end) currentLunch.end = Date.now();
+                currentWorker.isOnLunch = false;
+            }
+            currentWorker.currentShift.end = Date.now();
+            currentWorker.shifts.push(currentWorker.currentShift);
+            currentWorker.currentShift = null;
+            updateWorkerData();
+            updateShiftUI();
+            updateLunchUI();
+            renderShiftHistory();
+            renderLunchList();
+            showToast('Смена завершена', 'Хорошего отдыха!');
+        }
+
+        function updateShiftUI() {
+            const btnStart = document.getElementById('btnStartShift');
+            const btnEnd = document.getElementById('btnEndShift');
+            const statusText = document.getElementById('shiftStatusText');
+            const durationText = document.getElementById('shiftDurationText');
+            const indicator = document.getElementById('shiftIndicator');
+            const indicatorText = document.getElementById('shiftIndicatorText');
+            if (currentWorker.currentShift) {
+                btnStart.style.display = 'none';
+                btnEnd.style.display = 'flex';
+                btnEnd.classList.remove('hidden');
+                btnEnd.classList.add('flex');
+                statusText.textContent = 'Смена активна';
+                durationText.textContent = 'Начата: ' + new Date(currentWorker.currentShift.start).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+                indicator.classList.remove('hidden');
+                indicator.classList.add('flex');
+                indicatorText.textContent = 'Смена активна';
+            } else {
+                btnStart.style.display = 'flex';
+                btnEnd.style.display = 'none';
+                btnEnd.classList.add('hidden');
+                btnEnd.classList.remove('flex');
+                statusText.textContent = 'Смена не начата';
+                durationText.textContent = '—';
+                indicator.classList.add('hidden');
+                indicator.classList.remove('flex');
+            }
+            updateShiftTimer();
+        }
+
+        function updateShiftTimer() {
+            const durationText = document.getElementById('shiftDurationText');
+            if (currentWorker.currentShift) {
+                const elapsed = Date.now() - currentWorker.currentShift.start;
+                const mins = Math.floor(elapsed / 60000);
+                const hrs = Math.floor(mins / 60);
+                const remainMins = mins % 60;
+                durationText.textContent = `Длительность: ${hrs > 0 ? hrs + ' ч ' : ''}${remainMins} мин`;
+            }
+        }
+
+        function renderShiftHistory() {
+            const list = document.getElementById('shiftHistoryList');
+            const empty = document.getElementById('emptyShiftHistory');
+            const shifts = currentWorker.shifts || [];
+            if (shifts.length === 0) { list.innerHTML = ''; list.classList.add('hidden'); empty.classList.remove('hidden'); return; }
+            list.classList.remove('hidden');
+            empty.classList.add('hidden');
+            list.innerHTML = [...shifts].reverse().map(s => {
+                const start = new Date(s.start).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+                const end = s.end ? new Date(s.end).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}) : '—';
+                const duration = s.end ? formatDuration(s.end - s.start) : 'Активна';
+                return `<div class="bg-charcoal/5 rounded-xl p-4 flex items-center justify-between"><div><p class="font-medium text-charcoal text-sm">Начало: ${start}</p><p class="text-xs text-charcoal/60">Завершение: ${end}</p></div><div class="text-right"><p class="font-bold font-serif text-charcoal">${duration}</p><p class="text-xs text-charcoal/60">длительность</p></div></div>`;
+            }).join('');
+        }
+
+        function toggleLunch() {
+            if (!currentWorker.currentShift) { showToast('Сначала примите смену', 'Нельзя уйти на обед без активной смены'); return; }
+            if (!currentWorker.isOnLunch) {
+                currentWorker.isOnLunch = true;
+                currentWorker.lunchBreaks.push({ start: Date.now(), end: null });
+            } else {
+                currentWorker.isOnLunch = false;
+                const currentLunch = currentWorker.lunchBreaks[currentWorker.lunchBreaks.length - 1];
+                if (currentLunch && !currentLunch.end) currentLunch.end = Date.now();
+            }
+            updateWorkerData();
+            updateLunchUI();
+            renderLunchList();
+            updateStats();
+        }
+
+        function updateLunchUI() {
+            const btnText = document.getElementById('btnLunchText');
+            const statusText = document.getElementById('lunchStatusText');
+            const lunchBox = document.getElementById('lunchStatusBox');
+            if (currentWorker.isOnLunch) {
+                btnText.textContent = 'Вернуться к работе';
+                statusText.textContent = 'На обеде';
+                lunchBox.className = 'bg-amber-50 rounded-2xl p-6 mb-6 border border-amber-200';
+            } else {
+                btnText.textContent = 'На обед';
+                statusText.textContent = 'На рабочем месте';
+                lunchBox.className = 'bg-sand/30 rounded-2xl p-6 mb-6';
+            }
+            updateLunchTimer();
+        }
+
+        function updateLunchTimer() {
+            const durationText = document.getElementById('lunchDurationText');
+            if (currentWorker.isOnLunch) {
+                const currentLunch = currentWorker.lunchBreaks[currentWorker.lunchBreaks.length - 1];
+                if (currentLunch) {
+                    const elapsed = Date.now() - currentLunch.start;
+                    const mins = Math.floor(elapsed / 60000);
+                    const secs = Math.floor((elapsed % 60000) / 1000);
+                    durationText.textContent = `Длительность: ${mins} мин ${secs} сек`;
+                }
+            } else { durationText.textContent = '—'; }
+        }
+
+        function renderLunchList() {
+            const list = document.getElementById('lunchList');
+            const empty = document.getElementById('emptyLunchList');
+            const today = new Date().toDateString();
+            const todayLunches = (currentWorker.lunchBreaks || []).filter(l => new Date(l.start).toDateString() === today);
+            document.getElementById('totalLunchesToday').textContent = todayLunches.length;
+            let totalMs = 0;
+            todayLunches.forEach(l => { const end = l.end || Date.now(); totalMs += (end - l.start); });
+            document.getElementById('totalLunchTimeToday').textContent = Math.floor(totalMs / 60000) + ' мин';
+            if (todayLunches.length === 0) { list.innerHTML = ''; list.classList.add('hidden'); empty.classList.remove('hidden'); return; }
+            list.classList.remove('hidden');
+            empty.classList.add('hidden');
+            list.innerHTML = [...todayLunches].reverse().map((l, idx) => {
+                const start = new Date(l.start).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+                const end = l.end ? new Date(l.end).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}) : 'Сейчас';
+                const duration = l.end ? Math.floor((l.end - l.start) / 60000) + ' мин' : 'В процессе';
+                return `<div class="bg-charcoal/5 rounded-xl p-4 flex items-center justify-between"><div><p class="font-medium text-charcoal text-sm">Перерыв #${todayLunches.length - idx}</p><p class="text-xs text-charcoal/60">${start} — ${end}</p></div><div class="text-right"><p class="font-bold font-serif text-charcoal">${duration}</p></div></div>`;
+            }).join('');
+        }
+
+        // ========== STATS ==========
+        function updateStats() {
+            if (!currentWorker) return;
+            const orders = getOrders();
+            const today = new Date().toDateString();
+            const todayCompleted = orders.filter(o => o.workerId === currentWorker.login && o.completedAt && new Date(o.completedAt).toDateString() === today);
+            const count = todayCompleted.length;
+            document.getElementById('statCompleted').textContent = count;
+            if (count > 0) {
+                const totalTime = todayCompleted.reduce((sum, o) => sum + (o.pickingDuration || 0), 0);
+                const avgMs = totalTime / count;
+                document.getElementById('statAvgTime').textContent = formatDuration(avgMs);
+                const efficiency = Math.round((TARGET_TIME_PER_ORDER / avgMs) * 100);
+                document.getElementById('statEfficiency').textContent = efficiency + '%';
+            } else {
+                document.getElementById('statAvgTime').textContent = '--:--';
+                document.getElementById('statEfficiency').textContent = '0%';
+            }
+            const todayLunches = (currentWorker.lunchBreaks || []).filter(l => new Date(l.start).toDateString() === today);
+            let totalLunchMs = 0;
+            todayLunches.forEach(l => { const end = l.end || Date.now(); totalLunchMs += (end - l.start); });
+            const lunchMins = Math.floor(totalLunchMs / 60000);
+            document.getElementById('statLunchTime').textContent = `${lunchMins} мин`;
+            document.getElementById('statLunchCount').textContent = `(${todayLunches.length})`;
+        }
+
+        function updateDetailedStats() {
+            if (!currentWorker) return;
+            const orders = getOrders();
+            const today = new Date().toDateString();
+            const todayCompleted = orders.filter(o => o.workerId === currentWorker.login && o.completedAt && new Date(o.completedAt).toDateString() === today);
+            const allCompleted = orders.filter(o => o.workerId === currentWorker.login && o.completedAt);
+            document.getElementById('statsCompleted').textContent = todayCompleted.length;
+            document.getElementById('statsTotalCompleted').textContent = allCompleted.length;
+            if (todayCompleted.length > 0) {
+                const totalTime = todayCompleted.reduce((sum, o) => sum + (o.pickingDuration || 0), 0);
+                const avgMs = totalTime / todayCompleted.length;
+                document.getElementById('statsAvgTime').textContent = formatDuration(avgMs);
+                const efficiency = Math.round((TARGET_TIME_PER_ORDER / avgMs) * 100);
+                document.getElementById('statsEfficiency').textContent = efficiency + '%';
+                const best = todayCompleted.reduce((min, o) => (o.pickingDuration || 0) < (min.pickingDuration || 0) ? o : min);
+                const worst = todayCompleted.reduce((max, o) => (o.pickingDuration || 0) > (max.pickingDuration || 0) ? o : max);
+                document.getElementById('statsBestTime').textContent = formatDuration(best.pickingDuration);
+                document.getElementById('statsBestTimeOrder').textContent = `Заказ ${best.id}`;
+                document.getElementById('statsWorstTime').textContent = formatDuration(worst.pickingDuration);
+                document.getElementById('statsWorstTimeOrder').textContent = `Заказ ${worst.id}`;
+            } else {
+                document.getElementById('statsAvgTime').textContent = '--:--';
+                document.getElementById('statsEfficiency').textContent = '0%';
+                document.getElementById('statsBestTime').textContent = '--:--';
+                document.getElementById('statsBestTimeOrder').textContent = '—';
+                document.getElementById('statsWorstTime').textContent = '--:--';
+                document.getElementById('statsWorstTimeOrder').textContent = '—';
+            }
+            const todayLunches = (currentWorker.lunchBreaks || []).filter(l => new Date(l.start).toDateString() === today);
+            let totalLunchMs = 0;
+            todayLunches.forEach(l => { const end = l.end || Date.now(); totalLunchMs += (end - l.start); });
+            document.getElementById('statsLunchTotal').textContent = Math.floor(totalLunchMs / 60000) + ' мин';
+            document.getElementById('statsLunchBreaks').textContent = todayLunches.length + ' перерывов';
+        }
+
+        // ========== PROFILE ==========
+        function loadProfileForm() {
+            document.getElementById('profileFullName').value = currentWorker.fullName || '';
+            document.getElementById('profilePosition').value = currentWorker.position || '';
+            document.getElementById('profileWarehouse').value = currentWorker.warehouse || '';
+            document.getElementById('profileLogin').value = currentWorker.login;
+            const avatar = currentWorker.photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentWorker.login}`;
+            document.getElementById('profileAvatar').src = avatar;
+        }
+
+        function handlePhotoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                currentWorker.photo = e.target.result;
+                updateWorkerData();
+                document.getElementById('profileAvatar').src = e.target.result;
+                updateHeaderInfo();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function saveProfile() {
+            const fullName = document.getElementById('profileFullName').value.trim();
+            if (!fullName) { showToast('Ошибка', 'ФИО обязательно для заполнения'); return; }
+            currentWorker.fullName = fullName;
+            currentWorker.position = document.getElementById('profilePosition').value.trim();
+            currentWorker.warehouse = document.getElementById('profileWarehouse').value.trim();
+            updateWorkerData();
+            updateHeaderInfo();
+            showToast('Профиль сохранён', 'Изменения применены');
+        }
+
+        // ========== TOAST ==========
+        function showToast(title, message) {
+            const existing = document.getElementById('toast');
+            if (existing) existing.remove();
+            const toast = document.createElement('div');
+            toast.id = 'toast';
+            toast.className = 'fixed bottom-8 right-8 bg-charcoal text-white px-6 py-4 rounded-2xl shadow-2xl z-[70] flex items-center gap-3 max-w-sm slide-in';
+            toast.innerHTML = `<div class="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div><div><p class="font-semibold">${title}</p><p class="text-sm text-white/70">${message}</p></div>`;
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(20px)'; setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        // ========== DEMO ==========
+        function createTestOrder() {
+            const testOrder = {
+                id: 'ORD-TEST-' + Math.floor(Math.random() * 9000),
+                createdAt: Date.now() - (35 * 60 * 1000),
+                date: new Date(Date.now() - (35 * 60 * 1000)).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }),
+                items: [
+                    { id: 1, name: 'Solaris SPF 50+', price: 2490, volume: '50 мл', qty: 2, image: 'https://image.qwenlm.ai/public_source/89dc7435-d66c-4de0-94d3-f9cf72469b25/173ac74b0-a08a-4432-9bb0-87c9281b0b33.png', desc: 'Максимальная защита' },
+                    { id: 3, name: 'Solaris After Sun Gel', price: 1290, volume: '200 мл', qty: 1, image: 'https://image.qwenlm.ai/public_source/89dc7435-d66c-4de0-94d3-f9cf72469b25/1695cc96d-44b9-41d2-a23a-cbb893cc7e1c.png', desc: 'Восстанавливающий гель' }
+                ],
+                total: 6270,
+                delivery: 'Самовывоз',
+                deliveryAddress: 'г. Москва, ул. Солнечная, 15',
+                payment: 'При получении',
+                status: 'В обработке',
+                workerId: null
+            };
+            let dummyOrders = JSON.parse(localStorage.getItem('solaris_orders_demo_user') || '[]');
+            if (!Array.isArray(dummyOrders)) dummyOrders = [];
+            dummyOrders.push(testOrder);
+            localStorage.setItem('solaris_orders_demo_user', JSON.stringify(dummyOrders));
+            localStorage.setItem('solaris_messages_demo_user', JSON.stringify([]));
+            
+            if (syncChannel) {
+                syncChannel.postMessage({ type: 'order_created', orderId: testOrder.id, timestamp: Date.now() });
+            }
+            window.dispatchEvent(new Event('storage'));
+            
+            showToast('Тестовый заказ создан', '2 разных товара появятся во вкладке "Запросы"');
+        }
+    </script>
+</body>
+</html>
+
